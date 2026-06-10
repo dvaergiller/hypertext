@@ -211,6 +211,38 @@ fn component_optional_field_both_variants() {
     );
 }
 
+#[test]
+fn component_optional_field_toggle_none() {
+    let maud_result = maud! {
+        Header title=("Hello".into()) subtitle=[None];
+    }
+    .render();
+    let rsx_result = rsx! {
+        <Header title=("Hello".into()) subtitle=[None]>
+    }
+    .render();
+
+    for result in [maud_result, rsx_result] {
+        assert_eq!(result.as_inner(), "<div><h1>Hello</h1></div>");
+    }
+}
+
+#[test]
+fn component_optional_field_toggle_some() {
+    let maud_result = maud! {
+        Header title=("Hello".into()) subtitle=[Some("World".to_string())];
+    }
+    .render();
+    let rsx_result = rsx! {
+        <Header title=("Hello".into()) subtitle=[Some("World".to_string())]>
+    }
+    .render();
+
+    for result in [maud_result, rsx_result] {
+        assert_eq!(result.as_inner(), "<div><h1>Hello</h1><h2>World</h2></div>");
+    }
+}
+
 #[renderable]
 fn nav_bar<'a>(title: &'a str, subtitle: &String, add_smiley: bool) -> impl Renderable {
     maud! {

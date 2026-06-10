@@ -1,12 +1,12 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
     Ident, Lit, Token,
     parse::{Parse, ParseStream},
-    token::{Brace, Paren},
+    token::{Brace, Bracket, Paren},
 };
 
-use super::{AttributeValue, ElementBody, Generate, Generator, ParenExpr, Syntax};
+use super::{AttributeValue, ElementBody, Generate, Generator, ParenExpr, Syntax, Toggle};
 use crate::html::Node;
 
 pub struct Component<S: Syntax> {
@@ -21,8 +21,15 @@ impl<S: Syntax> Generate for Component<S> {
     fn generate(&self, g: &mut Generator) {
         let props = self.attrs.iter().map(|attr| {
             let name = &attr.name;
-            attr.value_expr()
-                .map_or_else(|| quote!(.#name(#name)), |value| quote!(.#name(#value)))
+
+            match attr.value_expr() {
+                Some(value) if let Some(ComponentAttributeValue::Toggle(_)) = attr.value => {
+                    let maybe_name = format_ident!("maybe_{name}");
+                    quote!(.#maybe_name(#value))
+                }
+                Some(value) => quote!(.#name(#value)),
+                None => quote!(.#name(#name)),
+            }
         });
 
         let children = match &self.body {
@@ -86,6 +93,15 @@ impl ComponentAttribute {
                     }
                 }
             }
+            ComponentAttributeValue::Toggle(toggle) => {
+                let expr = &toggle.expr;
+                quote! {
+                    {
+                        #[allow(unused_parens)]
+                        #expr
+                    }
+                }
+            }
         })
     }
 }
@@ -111,6 +127,7 @@ pub enum ComponentAttributeValue {
     Literal(Lit),
     Ident(Ident),
     Expr(ParenExpr<AttributeValue>),
+    Toggle(Toggle),
 }
 
 impl Parse for ComponentAttributeValue {
@@ -123,6 +140,8 @@ impl Parse for ComponentAttributeValue {
             input.parse().map(Self::Ident)
         } else if lookahead.peek(Paren) {
             input.parse().map(Self::Expr)
+        } else if lookahead.peek(Bracket) {
+            input.parse().map(Self::Toggle)
         } else {
             Err(lookahead.error())
         }
