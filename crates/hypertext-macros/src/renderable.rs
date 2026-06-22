@@ -148,6 +148,7 @@ pub fn generate(args: RenderableArgs, mut fn_item: ItemFn) -> syn::Result<TokenS
         .map(|attr| quote!(#attr))
         .collect::<Vec<_>>();
 
+    let is_default_builder = args.builder.is_none() && !fields.is_empty();
     let builder = args.builder.or_else(|| {
         if fields.is_empty() {
             None
@@ -157,9 +158,20 @@ pub fn generate(args: RenderableArgs, mut fn_item: ItemFn) -> syn::Result<TokenS
     });
 
     if let Some(BuilderArg::Path(path)) = builder {
-        struct_attrs.push(quote! {
-            #[derive(#path)]
-        });
+        let derive = if is_default_builder {
+            quote! {
+                #[derive(#path)]
+                #[builder(crate = ::hypertext::bon)]
+            }
+        } else {
+            quote! {
+                #[derive(#path)]
+            }
+        };
+
+        // Need to insert this in the beginning so that any user added
+        // `#[builder(..)]` parameters do not end up before `#[derive(..)]`
+        struct_attrs.insert(0, derive);
     }
 
     let fn_name = &fn_item.sig.ident;
